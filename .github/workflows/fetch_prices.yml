@@ -43,11 +43,13 @@ jobs:
             with urllib.request.urlopen(req, timeout=15) as resp:
               raw = resp.read().decode("utf-8", errors="replace")
 
+            print(f"MISO raw first 500 chars: {raw[:500]}")
             reader = csv.DictReader(io.StringIO(raw))
             rows = list(reader)
             print(f"MISO rows: {len(rows)}")
             if rows:
               print(f"MISO columns: {list(rows[0].keys())}")
+              print(f"MISO first row: {rows[0]}")
 
             # Normalise column names
             def norm(r):
