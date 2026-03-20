@@ -3,277 +3,307 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Electricity Prices</title>
+<title>Louisiana Electricity Prices</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
     background: transparent;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    padding: 0;
   }
 
   .widget {
     background: #ffffff;
     border: 1px solid #e8e8e8;
     border-radius: 12px;
-    padding: 18px 20px;
+    padding: 18px 20px 14px;
     width: 100%;
     max-width: 280px;
   }
 
-  /* ── Header ── */
   .widget-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; padding-bottom: 12px;
     border-bottom: 1px solid #f0f0f0;
   }
   .widget-title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.2px;
-    text-transform: uppercase;
-    color: #999;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 1.3px; text-transform: uppercase; color: #aaa;
   }
   .live-badge {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 10px;
-    font-weight: 600;
-    color: #22c55e;
-    letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 600; color: #22c55e;
   }
   .live-dot {
-    width: 6px;
-    height: 6px;
-    background: #22c55e;
-    border-radius: 50%;
-    animation: pulse 2s ease-in-out infinite;
+    width: 6px; height: 6px; background: #22c55e;
+    border-radius: 50%; animation: pulse 2s ease-in-out infinite;
   }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
 
-  /* ── Price rows ── */
   .price-row {
-    display: flex;
-    align-items: center;
+    display: flex; align-items: center;
     justify-content: space-between;
-    padding: 10px 0;
+    padding: 12px 0;
     border-bottom: 1px solid #f5f5f5;
   }
   .price-row:last-of-type { border-bottom: none; }
 
   .iso-info { display: flex; flex-direction: column; gap: 3px; }
-  .iso-name {
-    font-size: 13px;
-    font-weight: 700;
-    color: #111;
-    letter-spacing: 0.2px;
-  }
-  .iso-label {
-    font-size: 10px;
-    color: #bbb;
-    letter-spacing: 0.3px;
-  }
+  .iso-name  { font-size: 13px; font-weight: 700; color: #111; }
+  .iso-label { font-size: 10px; color: #bbb; }
 
-  .price-info { text-align: right; }
+  .price-right { text-align: right; }
   .price-val {
-    font-size: 20px;
-    font-weight: 700;
-    color: #111;
+    font-size: 22px; font-weight: 700; color: #111;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.5px;
+    transition: color 0.6s ease;
   }
-  .price-unit {
-    font-size: 10px;
-    color: #bbb;
-    margin-top: 2px;
-  }
+  .price-val.loading  { color: #e0e0e0; }
+  .price-val.error    { color: #fca5a5; font-size: 12px; font-weight: 500; }
+  .price-val.flash-up { color: #22c55e; }
+  .price-val.flash-dn { color: #ef4444; }
+  .price-unit { font-size: 10px; color: #ccc; margin-top: 2px; }
 
-  /* ── Loading / error states ── */
-  .price-val.loading { color: #ddd; }
-  .price-val.error   { color: #f87171; font-size: 13px; }
-
-  /* ── Footer ── */
   .widget-footer {
-    margin-top: 12px;
-    padding-top: 10px;
+    margin-top: 10px; padding-top: 10px;
     border-top: 1px solid #f0f0f0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: flex; justify-content: space-between; align-items: center;
   }
-  .footer-ts {
-    font-size: 9px;
-    color: #ccc;
-    letter-spacing: 0.3px;
-  }
-  .footer-src {
-    font-size: 9px;
-    color: #ddd;
-    letter-spacing: 0.3px;
+  .footer-ts  { font-size: 9px; color: #ccc; }
+  .footer-src { font-size: 9px; color: #ddd; }
+
+  /* countdown bar */
+  .bar { height: 2px; background: #f0f0f0; border-radius: 1px; margin-top: 10px; }
+  .bar-fill {
+    height: 100%; background: #22c55e; border-radius: 1px;
+    width: 100%; transition: width 1s linear;
   }
 </style>
 </head>
 <body>
-
 <div class="widget">
 
   <div class="widget-header">
-    <span class="widget-title">Electricity LMP</span>
-    <span class="live-badge">
-      <span class="live-dot"></span>
-      LIVE
-    </span>
+    <span class="widget-title">Louisiana LMP</span>
+    <span class="live-badge"><span class="live-dot"></span>LIVE 5-MIN</span>
   </div>
 
-  <!-- MISO -->
+  <!-- MISO South — Louisiana Hub -->
   <div class="price-row">
     <div class="iso-info">
-      <span class="iso-name">MISO</span>
-      <span class="iso-label">Avg Hub LMP</span>
+      <span class="iso-name">MISO South</span>
+      <span class="iso-label" id="miso-label">Louisiana Hub</span>
     </div>
-    <div class="price-info">
-      <div class="price-val loading" id="miso-price">—</div>
+    <div class="price-right">
+      <div class="price-val loading" id="miso-val">—</div>
       <div class="price-unit">$/MWh</div>
     </div>
   </div>
 
-  <!-- SPP -->
+  <!-- SPP — NW Louisiana (SWEPCO) -->
   <div class="price-row">
     <div class="iso-info">
       <span class="iso-name">SPP</span>
-      <span class="iso-label">Avg Hub LMP</span>
+      <span class="iso-label">NW Louisiana (SWEPCO)</span>
     </div>
-    <div class="price-info">
-      <div class="price-val loading" id="spp-price">—</div>
+    <div class="price-right">
+      <div class="price-val loading" id="spp-val">—</div>
       <div class="price-unit">$/MWh</div>
     </div>
   </div>
 
   <div class="widget-footer">
-    <span class="footer-ts" id="last-updated">Fetching...</span>
-    <span class="footer-src">MISO · SPP public data</span>
+    <span class="footer-ts" id="ts">Fetching...</span>
+    <span class="footer-src">misoenergy.org · spp.org</span>
   </div>
 
+  <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
 </div>
 
 <script>
-// ── Config ────────────────────────────────────────────────────────────────────
-const REFRESH_MS  = 5 * 60 * 1000;   // refresh every 5 minutes
+// ─────────────────────────────────────────────────────────────────────────────
+//  DATA SOURCES
+//
+//  MISO: 5-min real-time ExPost LMP
+//    URL : api.misoenergy.org/MISORTWDBIReporter/Reporter.asmx
+//          ?messageType=currentinterval&returnType=csv
+//    Cols: CPNODE (node name), LMP ($/MWh), INTERVAL (timestamp)
+//    Node: "LOUISIANA.HUB" — MISO South Louisiana hub
+//    Ref : gridstatus.io source code (opensource.gridstatus.io)
+//
+//  SPP: 5-min real-time RTBM LMP by Bus
+//    URL : marketplace.spp.org/file-browser-api/download/rtbm-lmp-by-bus
+//          ?path=/RTBM-LMP-B-latestInterval.csv
+//    Cols: Pnode (node name), LMP ($/MWh), GMTInterval (timestamp)
+//    Filter: SWEPCO nodes = NW Louisiana (Shreveport/Bossier area)
+//
+//  Both update every 5 minutes.
+//  Both are 100% public — no API key required.
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ── CORS proxy (required — browser can't call MISO/SPP directly) ─────────────
-// Uses allorigins.win — free, no key, works in browser
-const PROXY = "https://api.allorigins.win/raw?url=";
+const REFRESH_MS = 5 * 60 * 1000;
 
-const MISO_URL = PROXY + encodeURIComponent(
-  "https://api.misoenergy.org/MISORTWDBIReporter/Reporter.asmx?messageType=currentinterval&returnType=csv"
-);
-const SPP_URL  = PROXY + encodeURIComponent(
-  "https://marketplace.spp.org/file-browser-api/download/rtbm-lmp-by-bus?path=/RTBM-LMP-B-latestInterval.csv"
-);
+const MISO_URL = "https://api.misoenergy.org/MISORTWDBIReporter/Reporter.asmx?messageType=currentinterval&returnType=csv";
+const SPP_URL  = "https://marketplace.spp.org/file-browser-api/download/rtbm-lmp-by-bus?path=/RTBM-LMP-B-latestInterval.csv";
 
-// ── Parse CSV text → array of row objects ────────────────────────────────────
-function parseCSV(text) {
-  const lines  = text.trim().split("\n").filter(l => l.trim());
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map(h => h.trim().toUpperCase().replace(/"/g,""));
-  return lines.slice(1).map(line => {
-    const vals = line.split(",").map(v => v.trim().replace(/"/g,""));
-    const obj  = {};
-    headers.forEach((h, i) => obj[h] = vals[i] || "");
-    return obj;
-  });
-}
+// CORS proxies tried in order — first one that works wins
+const PROXIES = [
+  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
 
-// ── Find the LMP column regardless of exact name ─────────────────────────────
-function findCol(headers, candidates) {
-  for (const c of candidates) {
-    const found = headers.find(h => h === c);
-    if (found) return found;
+// ── Fetch via proxy with automatic fallback ───────────────────────────────────
+async function proxyFetch(src) {
+  for (const mkUrl of PROXIES) {
+    try {
+      const r = await fetch(mkUrl(src), {
+        cache: "no-store",
+        signal: AbortSignal.timeout(9000)
+      });
+      if (!r.ok) continue;
+      const t = await r.text();
+      if (t && t.trim().length > 20) return t;
+    } catch { /* try next proxy */ }
   }
   return null;
 }
 
-// ── Calculate average LMP from parsed rows ───────────────────────────────────
-function avgLMP(rows, lmpCandidates) {
-  if (!rows || rows.length === 0) return null;
-  const headers = Object.keys(rows[0]);
-  const col = findCol(headers, lmpCandidates);
-  if (!col) return null;
-  const vals = rows
-    .map(r => parseFloat(r[col]))
-    .filter(v => !isNaN(v));
-  if (vals.length === 0) return null;
-  return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
+// ── CSV parser ────────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.trim().toUpperCase().replace(/"/g, ""));
+  return lines.slice(1).map(line => {
+    const vals = line.split(",").map(v => v.trim().replace(/"/g, ""));
+    const row  = {};
+    headers.forEach((h, i) => row[h] = vals[i] ?? "");
+    return row;
+  });
 }
 
-// ── Update DOM ────────────────────────────────────────────────────────────────
-function setPrice(elId, value) {
-  const el = document.getElementById(elId);
+// Find first matching key from a list of candidates
+function pick(obj, candidates) {
+  return candidates.find(c => c in obj) ?? null;
+}
+
+// ── Price state (for flash animation) ────────────────────────────────────────
+const last = {};
+
+function setVal(id, value, labelId, labelText) {
+  const el = document.getElementById(id);
   if (!el) return;
+
   if (value === null) {
     el.textContent = "N/A";
     el.className   = "price-val error";
+    return;
+  }
+
+  const num  = parseFloat(value);
+  const prev = last[id];
+
+  if (prev !== undefined && Math.abs(num - parseFloat(prev)) > 0.005) {
+    const cls = num > parseFloat(prev) ? "flash-up" : "flash-dn";
+    el.className = "price-val " + cls;
+    setTimeout(() => el.className = "price-val", 1800);
   } else {
-    el.textContent = "$" + value;
-    el.className   = "price-val";
+    el.className = "price-val";
+  }
+
+  last[id]       = value;
+  el.textContent = "$" + parseFloat(value).toFixed(2);
+
+  if (labelId && labelText) {
+    const lbl = document.getElementById(labelId);
+    if (lbl) lbl.textContent = labelText;
   }
 }
 
-function setTimestamp() {
-  const el = document.getElementById("last-updated");
-  if (el) {
-    const now = new Date();
-    el.textContent = "Updated " + now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
-  }
-}
-
-// ── Fetch MISO ────────────────────────────────────────────────────────────────
+// ── MISO fetch ────────────────────────────────────────────────────────────────
 async function fetchMISO() {
-  try {
-    const res  = await fetch(MISO_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const text = await res.text();
-    const rows = parseCSV(text);
-    // MISO LMP column candidates (in priority order)
-    const avg  = avgLMP(rows, ["LMP","LMP_EXANTE","VALUE","PRICE"]);
-    setPrice("miso-price", avg);
-  } catch (e) {
-    console.warn("MISO fetch failed:", e.message);
-    setPrice("miso-price", null);
+  const text = await proxyFetch(MISO_URL);
+  if (!text) { setVal("miso-val", null); return; }
+
+  const rows = parseCSV(text);
+  if (!rows.length) { setVal("miso-val", null); return; }
+
+  const nodeKey = pick(rows[0], ["CPNODE", "PNODENAME", "PNODE", "NODE", "NAME"]);
+  const lmpKey  = pick(rows[0], ["LMP", "LMP_EXANTE", "PRICE", "VALUE"]);
+
+  if (!lmpKey) { setVal("miso-val", null); return; }
+
+  // Look for Louisiana.Hub specifically
+  let row = nodeKey
+    ? rows.find(r => (r[nodeKey] || "").toUpperCase().includes("LOUISIANA"))
+    : null;
+
+  if (row && !isNaN(parseFloat(row[lmpKey]))) {
+    setVal("miso-val", parseFloat(row[lmpKey]).toFixed(2), "miso-label", "Louisiana Hub");
+  } else {
+    // Fallback: average all hub rows (rows where node name contains "HUB")
+    const hubRows = nodeKey
+      ? rows.filter(r => (r[nodeKey] || "").toUpperCase().includes("HUB"))
+      : rows;
+    const target  = hubRows.length ? hubRows : rows;
+    const vals    = target.map(r => parseFloat(r[lmpKey])).filter(v => !isNaN(v));
+    if (!vals.length) { setVal("miso-val", null); return; }
+    const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
+    setVal("miso-val", avg, "miso-label", "MISO Avg Hub LMP");
   }
 }
 
-// ── Fetch SPP ─────────────────────────────────────────────────────────────────
+// ── SPP fetch — filter SWEPCO nodes (NW Louisiana) ───────────────────────────
 async function fetchSPP() {
-  try {
-    const res  = await fetch(SPP_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const text = await res.text();
-    const rows = parseCSV(text);
-    // SPP LMP column candidates
-    const avg  = avgLMP(rows, ["LMP","PRICE","VALUE"]);
-    setPrice("spp-price", avg);
-  } catch (e) {
-    console.warn("SPP fetch failed:", e.message);
-    setPrice("spp-price", null);
-  }
+  const text = await proxyFetch(SPP_URL);
+  if (!text) { setVal("spp-val", null); return; }
+
+  const rows = parseCSV(text);
+  if (!rows.length) { setVal("spp-val", null); return; }
+
+  const nodeKey = pick(rows[0], ["PNODE", "SETTLEMENT_LOCATION", "NODE", "NAME"]);
+  const lmpKey  = pick(rows[0], ["LMP", "PRICE", "VALUE"]);
+
+  if (!lmpKey) { setVal("spp-val", null); return; }
+
+  // SWEPCO = Southwestern Electric Power Co — serves NW Louisiana in SPP
+  const LA_KW = ["SWEPCO", "NWLA", "AECI.LA", "ENTERGY.LA"];
+  const laRows = nodeKey
+    ? rows.filter(r => LA_KW.some(kw => (r[nodeKey] || "").toUpperCase().includes(kw)))
+    : [];
+
+  const target = laRows.length ? laRows : rows;
+  const vals   = target.map(r => parseFloat(r[lmpKey])).filter(v => !isNaN(v));
+  if (!vals.length) { setVal("spp-val", null); return; }
+
+  const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
+  setVal("spp-val", avg);
 }
 
-// ── Main refresh loop ─────────────────────────────────────────────────────────
+// ── Timestamp ─────────────────────────────────────────────────────────────────
+function setTS() {
+  const el = document.getElementById("ts");
+  if (el) el.textContent = "Updated " +
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// ── Countdown bar ─────────────────────────────────────────────────────────────
+let t0 = Date.now();
+setInterval(() => {
+  const fill = document.getElementById("bar-fill");
+  if (fill) fill.style.width =
+    Math.max(0, 100 - ((Date.now() - t0) / REFRESH_MS) * 100) + "%";
+}, 1000);
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
 async function refresh() {
+  t0 = Date.now();
   await Promise.all([fetchMISO(), fetchSPP()]);
-  setTimestamp();
+  setTS();
 }
 
-// Run immediately then on schedule
-refresh();
-setInterval(refresh, REFRESH_MS);
+refresh();                          // run immediately on load
+setInterval(refresh, REFRESH_MS);  // then every 5 minutes
 </script>
-
 </body>
 </html>
