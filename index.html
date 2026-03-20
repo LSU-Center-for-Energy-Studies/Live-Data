@@ -57,7 +57,8 @@
   .price-val.error    { color: #fca5a5; font-size: 12px; font-weight: 500; }
   .price-val.flash-up { color: #22c55e; }
   .price-val.flash-dn { color: #ef4444; }
-  .price-unit { font-size: 10px; color: #ccc; margin-top: 2px; }
+  .price-unit     { font-size: 10px; color: #ccc; margin-top: 2px; }
+  .price-interval { font-size: 9px;  color: #ddd; margin-top: 1px; }
 
   .widget-footer {
     margin-top: 10px; padding-top: 10px;
@@ -79,24 +80,27 @@
 
   <div class="widget-header">
     <span class="widget-title">Louisiana LMP</span>
-    <span class="live-badge"><span class="live-dot"></span>LIVE 5-MIN</span>
+    <span class="live-badge"><span class="live-dot"></span>LIVE</span>
   </div>
 
+  <!-- MISO — Louisiana Hub -->
   <div class="price-row">
     <div class="iso-info">
       <span class="iso-name">MISO South</span>
-      <span class="iso-label" id="miso-label">Louisiana Hub</span>
+      <span class="iso-label">Louisiana Hub · ExAnte LMP</span>
     </div>
     <div class="price-right">
       <div class="price-val loading" id="miso-val">—</div>
       <div class="price-unit">$/MWh</div>
+      <div class="price-interval" id="miso-interval"></div>
     </div>
   </div>
 
+  <!-- SPP — NW Louisiana -->
   <div class="price-row">
     <div class="iso-info">
       <span class="iso-name">SPP</span>
-      <span class="iso-label" id="spp-label">NW Louisiana (SWEPCO)</span>
+      <span class="iso-label">NW Louisiana · SWEPCO</span>
     </div>
     <div class="price-right">
       <div class="price-val loading" id="spp-val">—</div>
@@ -106,7 +110,7 @@
 
   <div class="widget-footer">
     <span class="footer-ts" id="ts">Fetching...</span>
-    <span class="footer-src">misoenergy.org · spp.org</span>
+    <span class="footer-src">public-api.misoenergy.org · spp.org</span>
   </div>
 
   <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
@@ -114,103 +118,139 @@
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
-//  HOW THIS WORKS — NO CORS PROXY NEEDED
+//  MISO: https://public-api.misoenergy.org/api/MarketPricing/GetExAnteLmp
+//  → JSON. No API key. No proxy needed.
+//  → Returns all hubs. We pick LOUISIANA.HUB.
+//  → Updates every 5 minutes.
 //
-//  GitHub Actions runs fetch_prices.yml every 5 minutes.
-//  It fetches MISO + SPP CSVs server-side (no CORS restriction on servers)
-//  and saves the result as data.json in this same repo.
-//
-//  This widget reads data.json from the SAME origin (GitHub Pages) —
-//  same-origin requests never have CORS issues. Completely reliable.
+//  SPP: marketplace.spp.org RTBM-LMP-B-latestInterval.csv
+//  → CSV. No API key. Proxy needed (CORS).
+//  → Filtered for SWEPCO nodes (NW Louisiana).
+//  → Updates every 5 minutes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const RELOAD_MS = 5 * 60 * 1000;  // reload every 5 min
+const REFRESH_MS = 5 * 60 * 1000;
 
+const MISO_URL = "https://public-api.misoenergy.org/api/MarketPricing/GetExAnteLmp";
+const SPP_URL  = "https://marketplace.spp.org/file-browser-api/download/rtbm-lmp-by-bus?path=/RTBM-LMP-B-latestInterval.csv";
+
+const PROXIES = [
+  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
+
+// ── Flash animation ───────────────────────────────────────────────────────────
 const prev = {};
-
-function setVal(id, price, labelId, labelText) {
-  const el  = document.getElementById(id);
-  const lbl = labelId ? document.getElementById(labelId) : null;
+function setVal(id, value) {
+  const el = document.getElementById(id);
   if (!el) return;
-
-  if (price === null || price === undefined) {
-    el.textContent = "N/A";
-    el.className   = "price-val error";
-    return;
+  if (value === null || value === undefined) {
+    el.textContent = "N/A"; el.className = "price-val error"; return;
   }
-
-  const num = parseFloat(price);
-  if (!isNaN(num)) {
-    // flash animation when price changes
-    if (prev[id] !== undefined) {
-      const diff = num - parseFloat(prev[id]);
-      if (Math.abs(diff) > 0.01) {
-        el.className = "price-val " + (diff > 0 ? "flash-up" : "flash-dn");
-        setTimeout(() => el.className = "price-val", 1800);
-      } else {
-        el.className = "price-val";
-      }
-    } else {
-      el.className = "price-val";
-    }
-    prev[id]       = price;
-    el.textContent = "$" + num.toFixed(2);
-  }
-
-  if (lbl && labelText) lbl.textContent = labelText;
+  const num = parseFloat(value);
+  if (isNaN(num)) { el.textContent = "N/A"; el.className = "price-val error"; return; }
+  if (prev[id] !== undefined) {
+    const diff = num - parseFloat(prev[id]);
+    if (Math.abs(diff) > 0.01) {
+      el.className = "price-val " + (diff > 0 ? "flash-up" : "flash-dn");
+      setTimeout(() => el.className = "price-val", 1800);
+    } else { el.className = "price-val"; }
+  } else { el.className = "price-val"; }
+  prev[id] = value;
+  el.textContent = "$" + num.toFixed(2);
 }
 
-function setTS(utcStr) {
-  const el = document.getElementById("ts");
-  if (!el) return;
-  // Convert UTC string to local time for display
+// ── MISO fetch — direct, no proxy ────────────────────────────────────────────
+async function fetchMISO() {
   try {
-    const d   = new Date(utcStr);
-    el.textContent = "Updated " +
-      d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) +
-      " (local)";
-  } catch {
-    el.textContent = "Updated " + (utcStr || "—");
-  }
-}
-
-// Countdown bar
-let t0 = Date.now();
-setInterval(() => {
-  const fill = document.getElementById("bar-fill");
-  if (fill) fill.style.width =
-    Math.max(0, 100 - ((Date.now() - t0) / RELOAD_MS) * 100) + "%";
-}, 1000);
-
-// ── Fetch data.json from same repo ───────────────────────────────────────────
-async function loadPrices() {
-  try {
-    // cache-bust so browser always fetches latest version
-    const res  = await fetch("data.json?t=" + Date.now(), { cache: "no-store" });
+    const res  = await fetch(MISO_URL, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000)
+    });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
 
-    setVal("miso-val", data.miso?.price, "miso-label", data.miso?.label);
-    setVal("spp-val",  data.spp?.price,  "spp-label",  data.spp?.label);
-    setTS(data.updated_ts || data.updated_utc);
+    const hubs     = data?.LMPData?.ExAnteLMP?.Hub || [];
+    const interval = data?.LMPData?.RefId || "";
+    const laHub    = hubs.find(h => h.name === "LOUISIANA.HUB");
 
+    if (laHub) {
+      setVal("miso-val", laHub.LMP);
+      const intEl = document.getElementById("miso-interval");
+      if (intEl) intEl.textContent = interval;
+    } else {
+      setVal("miso-val", null);
+    }
   } catch (e) {
-    console.warn("data.json fetch failed:", e.message);
+    console.warn("MISO error:", e.message);
     setVal("miso-val", null);
-    setVal("spp-val",  null);
-    const ts = document.getElementById("ts");
-    if (ts) ts.textContent = "Fetch failed — retrying...";
   }
 }
 
-// ── Main loop ─────────────────────────────────────────────────────────────────
+// ── CSV parser ────────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const hdrs = lines[0].split(",").map(h => h.trim().toUpperCase().replace(/"/g,""));
+  return lines.slice(1).map(line => {
+    const vals = line.split(",").map(v => v.trim().replace(/"/g,""));
+    const row  = {};
+    hdrs.forEach((h, i) => row[h] = vals[i] ?? "");
+    return row;
+  });
+}
+
+// ── SPP fetch — proxy fallback ────────────────────────────────────────────────
+async function fetchSPP() {
+  for (const mkUrl of PROXIES) {
+    try {
+      const res = await fetch(mkUrl(SPP_URL), {
+        cache: "no-store", signal: AbortSignal.timeout(9000)
+      });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (!text || text.length < 20) continue;
+
+      const rows    = parseCSV(text);
+      if (!rows.length) continue;
+      const nodeKey = ["PNODE","SETTLEMENT_LOCATION","NODE","NAME"].find(k => k in rows[0]);
+      const lmpKey  = ["LMP","PRICE","VALUE"].find(k => k in rows[0]);
+      if (!lmpKey) continue;
+
+      const LA_KW  = ["SWEPCO","NWLA"];
+      const laRows = nodeKey
+        ? rows.filter(r => LA_KW.some(kw => (r[nodeKey]||"").toUpperCase().includes(kw)))
+        : [];
+      const target = laRows.length ? laRows : rows;
+      const vals   = target.map(r => parseFloat(r[lmpKey])).filter(v => !isNaN(v));
+      if (!vals.length) continue;
+
+      setVal("spp-val", (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2));
+      return;
+    } catch { continue; }
+  }
+  setVal("spp-val", null);
+}
+
+// ── Countdown bar ─────────────────────────────────────────────────────────────
+let t0 = Date.now();
+setInterval(() => {
+  const f = document.getElementById("bar-fill");
+  if (f) f.style.width = Math.max(0, 100 - ((Date.now()-t0)/REFRESH_MS)*100) + "%";
+}, 1000);
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 async function refresh() {
   t0 = Date.now();
-  await loadPrices();
+  await Promise.all([fetchMISO(), fetchSPP()]);
+  const el = document.getElementById("ts");
+  if (el) el.textContent = "Updated " +
+    new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
 }
 
 refresh();
-setInterval(refresh, RELOAD_MS);
+setInterval(refresh, REFRESH_MS);
 </script>
 </body>
 </html>
