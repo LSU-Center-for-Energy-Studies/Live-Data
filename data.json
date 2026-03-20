@@ -1,0 +1,6 @@
+{
+  "miso": { "price": null, "label": "Louisiana Hub",       "source": "MISO South" },
+  "spp":  { "price": null, "label": "NW Louisiana (SWEPCO)", "source": "SPP" },
+  "updated_utc": "Pending first fetch...",
+  "updated_ts":  null
+}
